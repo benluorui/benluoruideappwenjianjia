@@ -2,4 +2,3 @@ streamlit
 matplotlib 
 seaborn
 numpy
-matplotlib.pyplot

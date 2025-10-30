@@ -76,12 +76,7 @@ def load_and_process_data(file_path='uber.csv', sample_size=5000):
     # 新增：展示提取的年月日字段示例（方便验证是否成功）
     st.write("提取的时间字段示例（前5行）:")
     st.dataframe(df_cleaned[['pickup_datetime', 'year', 'month', 'day', 'weekday']].head())
-    df['month'] = df['pickup_datetime'].dt.month
-
-
-  
-  
-  
+    
     return df_cleaned
 
 # 数据探索函数（必须放在 load_and_process_data() 之后、main() 之前）
@@ -525,4 +520,3 @@ if not filtered_df.empty:
     st.snow() 
     st.balloons()
     st.snow() 
-   

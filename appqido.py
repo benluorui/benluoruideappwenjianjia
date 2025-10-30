@@ -443,20 +443,8 @@ with st.spinner('正在处理月份数据...'):
     df = df.dropna(subset=['pickup_datetime'])
     df['year'] = df['pickup_datetime'].dt.year.astype(int)  # 保留年份用于筛选
     df['month'] = df['pickup_datetime'].dt.month.astype(int)  # 提取月份（1-12）
+    df['month_name'] = df['pickup_datetime'].dt.month_name(locale='zh_CN')  # 月份中文名（1→1月）
     
-    # 关键修改：手动映射中文月份名称（替换原locale方式）
-    month_mapping = {
-        1: '1月', 2: '2月', 3: '3月', 4: '4月', 5: '5月', 6: '6月',
-        7: '7月', 8: '8月', 9: '9月', 10: '10月', 11: '11月', 12: '12月'
-    }
-    df['month_name'] = df['month'].map(month_mapping)  # 生成中文月份名
-    
-    # 获取有效年份范围
-    valid_years = sorted(df['year'].unique())
-    st.balloons()  # 加载完成释放气球特效
-
-# 后续代码保持不变...# 用已提取的month列（数字1-12）映射中文名称
-df['month_name'] = df['month'].map(month_mapping)
     # 获取有效年份范围
     valid_years = sorted(df['year'].unique())
     st.balloons()  # 加载完成释放气球特效

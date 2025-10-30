@@ -475,13 +475,25 @@ with col1:
 
 with col2:
     # 选择分析指标
-    analysis_metric = st.selectbox(
-        '选择分析指标',
-        options=['平均车费($)', '总订单数', '总乘客数'],
-        index=0
-    )
+    analysis_metric_display = st.selectbox(  # 变量名改为“显示名称”
+    '选择分析指标',
+    options=['平均车费($)', '总订单数', '总乘客数'],  # 仍保留用户友好的显示名称
+    index=0
+)
 
+# 添加映射字典（核心修改）
+metric_mapping = {
+    '平均车费($)': '平均车费',  # 显示名称 → 实际列名（数据框中真实存在的列）
+    '总订单数': '总订单数',
+    '总乘客数': '总乘客数'
+}
+analysis_metric = metric_mapping[analysis_metric_display]  # 转换为实际列名
 
+# 修正排序逻辑（使用转换后的列名）
+filtered_routes = route_stats[route_stats['总订单数'] >= min_orders].sort_values(
+    analysis_metric,  # 现在使用的是实际列名（如“平均车费”），与数据框匹配
+    ascending=False
+).head(20)
 # 3. 数据聚合与过滤
 # 按路线分组计算核心指标
 route_stats = df.groupby('route').agg(

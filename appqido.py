@@ -79,12 +79,8 @@ def load_and_process_data(file_path='uber.csv', sample_size=5000):
     df['month'] = df['pickup_datetime'].dt.month
 
 
-    df['month'] = df['pickup_datetime'].dt.month
-# 2. 手动映射中文月份（无任何locale依赖）
-    month_map = {1:'1月',2:'2月',3:'3月',4:'4月',5:'5月',6:'6月',
-             7:'7月',8:'8月',9:'9月',10:'10月',11:'11月',12:'12月'}
-    df['month_name'] = df['month'].map(month_map)
-# 2. 手动映射中文月份（无任何locale依赖）
+  
+  
   
     return df_cleaned
 

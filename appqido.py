@@ -432,22 +432,137 @@ else:
 
 
 
-    
-    st.subheader("5. 商业价值分析")
-    
-    # 5.1 高峰时段分析
-    hourly_avg_fare = df.groupby('hour')['fare_amount'].mean().reset_index()
-    peak_hour = hourly_avg_fare.loc[hourly_avg_fare['fare_amount'].idxmax()]
-    
-    st.write(f"• 车费最高的时段: {int(peak_hour['hour'])}点，平均车费: ${peak_hour['fare_amount']:.2f}")
-    
-    # 5.2 乘客数量与车费关系
-    passenger_fare = df.groupby('passenger_count')['fare_amount'].mean().reset_index()
-    st.write("• 不同乘客数量的平均车费:")
-    st.dataframe(passenger_fare.rename(columns={
-        'passenger_count': '乘客数量', 
-        'fare_amount': '平均车费($)'
 
+
+st.header('互动分析：热门路线与车费关系')
+
+# 1. 数据预处理（提取上下车经纬度并清洗）
+with st.spinner('正在加载路线数据...'):
+    # 确保经纬度有效（基于纽约范围）
+    df = df[
+        (df['pickup_latitude'].between(40.4, 41.0)) &
+        (df['pickup_longitude'].between(-74.3, -73.7)) &
+        (df['dropoff_latitude'].between(40.4, 41.0)) &
+        (df['dropoff_longitude'].between(-74.3, -73.7))
+    ]
+    
+    # 简化经纬度（保留2位小数，减少计算量）
+    df['pickup_lat_round'] = df['pickup_latitude'].round(2)
+    df['pickup_lon_round'] = df['pickup_longitude'].round(2)
+    df['dropoff_lat_round'] = df['dropoff_latitude'].round(2)
+    df['dropoff_lon_round'] = df['dropoff_longitude'].round(2)
+    
+    # 生成路线标识（便于分组）
+    df['route'] = df.apply(
+        lambda x: f"({x['pickup_lat_round']},{x['pickup_lon_round']})→({x['dropoff_lat_round']},{x['dropoff_lon_round']})",
+        axis=1
+    )
+    
+    st.balloons()  # 加载完成提示
+
+
+# 2. 互动筛选组件（多条件联动）
+col1, col2 = st.columns(2)
+with col1:
+    # 筛选路线订单量阈值（只看热门路线）
+    min_orders = st.slider(
+        '最低订单数量（筛选热门路线）',
+        min_value=5,
+        max_value=50,
+        value=10,
+        help='只显示订单数≥此值的路线'
+    )
+
+with col2:
+    # 选择分析指标
+    analysis_metric = st.selectbox(
+        '选择分析指标',
+        options=['平均车费($)', '总订单数', '总乘客数'],
+        index=0
+    )
+
+
+# 3. 数据聚合与过滤
+# 按路线分组计算核心指标
+route_stats = df.groupby('route').agg(
+    平均车费=('fare_amount', 'mean'),
+    总订单数=('route', 'count'),
+    总乘客数=('passenger_count', 'sum'),
+    起点纬度=('pickup_lat_round', 'first'),
+    起点经度=('pickup_lon_round', 'first'),
+    终点纬度=('dropoff_lat_round', 'first'),
+    终点经度=('dropoff_lon_round', 'first')
+).reset_index()
+
+# 应用订单量筛选
+filtered_routes = route_stats[route_stats['总订单数'] >= min_orders].sort_values(
+    analysis_metric, ascending=False
+).head(20)  # 只显示前20名热门路线
+
+
+# 4. 互动可视化（地图+图表联动）
+if not filtered_routes.empty:
+    st.success(f'已筛选出 {len(filtered_routes)} 条热门路线（订单数≥{min_orders}）')
+    
+    # 4.1 地图标记热门路线起点
+    st.subheader('热门路线起点分布')
+    map_data = filtered_routes[['起点纬度', '起点经度']].rename(
+        columns={'起点纬度': 'latitude', '起点经度': 'longitude'}
+    )
+    st.map(map_data, zoom=11)  # 聚焦纽约区域
+    
+    # 4.2 指标排行榜（横向柱状图）
+    st.subheader(f'热门路线{analysis_metric}排行榜')
+    plt.figure(figsize=(10, 8))
+    
+    # 按选择的指标排序并绘图
+    if analysis_metric == '平均车费($)':
+        sns.barplot(
+            x='平均车费', 
+            y='route', 
+            data=filtered_routes.sort_values('平均车费', ascending=False),
+            palette='coolwarm'
+        )
+        plt.xlabel('平均车费($)')
+    elif analysis_metric == '总订单数':
+        sns.barplot(
+            x='总订单数', 
+            y='route', 
+            data=filtered_routes.sort_values('总订单数', ascending=False),
+            palette='viridis'
+        )
+        plt.xlabel('总订单数')
+    else:
+        sns.barplot(
+            x='总乘客数', 
+            y='route', 
+            data=filtered_routes.sort_values('总乘客数', ascending=False),
+            palette='magma'
+        )
+        plt.xlabel('总乘客数')
+    
+    plt.ylabel('路线（起点→终点）')
+    plt.title(f'热门路线{analysis_metric}TOP20', pad=20)
+    plt.tight_layout()
+    st.pyplot(plt)
+    
+    # 4.3 路线详情表格（支持排序）
+    st.subheader('路线详细数据')
+    display_cols = {
+        'route': '路线',
+        '平均车费': '平均车费($)',
+        '总订单数': '总订单数',
+        '总乘客数': '总乘客数'
+    }
+    st.dataframe(
+        filtered_routes.rename(columns=display_cols)[display_cols.values()],
+        use_container_width=True,
+        hide_index=True
+    )
+
+else:
+    st.warning(f'无满足条件的路线，请降低订单量阈值（当前≥{min_orders}）')
+   
 
 
 

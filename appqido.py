@@ -46,7 +46,7 @@ def load_and_process_data(file_path='uber.csv', sample_size=5000):
     df_cleaned['day'] = df_cleaned['pickup_datetime'].dt.day
     df_cleaned['weekday'] = df_cleaned['pickup_datetime'].dt.dayofweek
     df_cleaned['quarter'] = df_cleaned['pickup_datetime'].dt.quarter
-    df_cleaned['hour'] = df_cleaned['pickup_datetime'].dt.hour
+    df_cleaned['hour'] = df_cleaned['pickup_datetime'].dt.hour  # 时段（小时，0-23）
     
     # 过滤无效时间数据
     df_cleaned = df_cleaned.dropna(subset=['pickup_datetime', 'year', 'month', 'day', 'weekday'])
@@ -246,9 +246,93 @@ def business_value_analysis(df):
     • 商业应用4: 路线规划优化 - 分析高频路线，提升运营效率
     """)
 
-# 互动分析：热门路线与车费关系
+# 第一互动插件：时段与车费金额关系
+def hour_fare_analysis(df):
+    st.header('互动分析1：一天中的不同时段如何影响车费金额？')
+    
+    # 数据处理（确保时间格式正确）
+    with st.spinner('正在处理时间数据...'):
+        # 转换并过滤时间字段
+        df['pickup_datetime'] = pd.to_datetime(df['pickup_datetime'], errors='coerce')
+        df = df.dropna(subset=['pickup_datetime'])
+        df['hour'] = df['pickup_datetime'].dt.hour.astype(int)  # 提取小时（0-23）
+        st.balloons()  # 加载完成提示
+    
+    # 时段筛选滑块
+    st.subheader('选择分析的小时范围')
+    hour_min = int(df['hour'].min())
+    hour_max = int(df['hour'].max())
+    selected_hour = st.slider(
+        '拖动滑块选择时段范围',
+        min_value=hour_min,
+        max_value=hour_max,
+        value=(hour_min, hour_max),
+        format='%d点'  # 显示为“X点”格式
+    )
+    
+    # 过滤数据并反馈
+    filtered_df_hour = df[(df['hour'] >= selected_hour[0]) & (df['hour'] <= selected_hour[1])]
+    st.info(f'已筛选出 {selected_hour[0]}点 至 {selected_hour[1]}点 的数据，共 {len(filtered_df_hour)} 条记录')
+    
+    # 分析并可视化
+    if not filtered_df_hour.empty:
+        hourly_avg_fare = filtered_df_hour.groupby('hour')['fare_amount'].mean().reset_index()
+        st.success('数据计算完成！')
+        
+        # 绘制时段-平均车费折线图
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(
+            x='hour', 
+            y='fare_amount', 
+            data=hourly_avg_fare, 
+            marker='o',
+            linewidth=2,
+            color='#4285F4'
+        )
+        
+        # 高亮峰值点
+        peak_idx = hourly_avg_fare['fare_amount'].idxmax()
+        peak_hour = hourly_avg_fare.loc[peak_idx]
+        plt.scatter(
+            peak_hour['hour'], 
+            peak_hour['fare_amount'], 
+            color='red', 
+            s=100,
+            zorder=5,
+            label=f'峰值：{peak_hour["hour"]}点（${peak_hour["fare_amount"]:.2f}）'
+        )
+        
+        # 图表美化
+        plt.title(
+            f'{selected_hour[0]}点至{selected_hour[1]}点的平均车费趋势',
+            fontsize=14,
+            pad=20
+        )
+        plt.xlabel('小时（24小时制）', fontsize=12)
+        plt.ylabel('平均车费金额（$）', fontsize=12)
+        plt.xticks(range(selected_hour[0], selected_hour[1]+1), rotation=0)
+        plt.grid(alpha=0.3, linestyle='--')
+        plt.legend()
+        st.pyplot(plt)
+        plt.close()
+        
+        # 显示时段详情表格（高亮峰值）
+        st.subheader('时段平均车费详情')
+        def highlight_peak(row):
+            if row['hour'] == peak_hour['hour']:
+                return ['background-color: #FFCCCC'] * len(row)
+            else:
+                return [''] * len(row)
+        styled_df = hourly_avg_fare.style.apply(highlight_peak, axis=1).format({
+            'fare_amount': '${:.2f}'
+        })
+        st.dataframe(styled_df, use_container_width=True)
+    else:
+        st.warning('所选时段内无数据，请调整范围！')
+
+# 第二互动插件：热门路线与车费关系
 def route_analysis(df):
-    st.header('互动分析：热门路线与车费关系')
+    st.header('互动分析2：热门路线与车费关系')
     
     # 1. 数据预处理
     with st.spinner('正在加载路线数据...'):
@@ -381,7 +465,8 @@ def main():
     # 商业价值分析
     business_value_analysis(df)
     
-    # 互动分析模块
+    # 互动分析模块（先时段-车费，再路线分析）
+    hour_fare_analysis(df)
     route_analysis(df)
     
     # 数据下载
@@ -396,99 +481,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-st.header('一天中的不同时段如何影响车费金额？')
-
-# 添加加载动画（数据处理时显示）
-with st.spinner('正在处理时间数据...'):
-    # 转换 pickup_datetime 为日期时间类型（添加容错处理）
-    df['pickup_datetime'] = pd.to_datetime(df['pickup_datetime'], errors='coerce')
-    
-    # 提取小时信息（过滤无效时间）
-    df = df.dropna(subset=['pickup_datetime'])
-    df['hour'] = df['pickup_datetime'].dt.hour
-    df['hour'] = df['hour'].astype(int)
-
-# 数据加载完成后显示气球特效
-st.balloons()  # 新增：释放彩色气球
-
-# 筛选组件 - 美化滑块样式
-st.subheader('选择分析的小时范围')
-hour_min = int(df['hour'].min())
-hour_max = int(df['hour'].max())
-selected_hour = st.slider(
-    '拖动滑块选择时段范围',
-    min_value=hour_min,
-    max_value=hour_max,
-    value=(hour_min, hour_max),
-    format='%d点'  # 显示为“X点”格式
-)
-
-# 过滤数据（添加数据量反馈）
-filtered_df_hour = df[(df['hour'] >= selected_hour[0]) & (df['hour'] <= selected_hour[1])]
-st.info(f'已筛选出 {selected_hour[0]}点 至 {selected_hour[1]}点 的数据，共 {len(filtered_df_hour)} 条记录')
-
-# 分析不同时段的平均车费金额（添加计算成功提示）
-if not filtered_df_hour.empty:
-    hourly_avg_fare = filtered_df_hour.groupby('hour')['fare_amount'].mean().reset_index()
-    st.success('数据计算完成！')
-    
-    # 绘制折线图（添加动态高亮特效）
-    plt.figure(figsize=(10, 6))
-    
-    # 基础折线
-    sns.lineplot(
-        x='hour', 
-        y='fare_amount', 
-        data=hourly_avg_fare, 
-        marker='o',
-        linewidth=2,
-        color='#4285F4'  # 谷歌蓝
-    )
-    
-    # 高亮峰值点（特效1：标记最高车费时段）
-    peak_idx = hourly_avg_fare['fare_amount'].idxmax()
-    peak_hour = hourly_avg_fare.loc[peak_idx]
-    plt.scatter(
-        peak_hour['hour'], 
-        peak_hour['fare_amount'], 
-        color='red', 
-        s=100,  # 点大小
-        zorder=5,  # 置于顶层
-        label=f'峰值：{peak_hour["hour"]}点（${peak_hour["fare_amount"]:.2f}）'
-    )
-    
-    # 图表美化（特效2：动态标题和网格）
-    plt.title(
-        f'{selected_hour[0]}点至{selected_hour[1]}点的平均车费趋势',
-        fontsize=14,
-        pad=20
-    )
-    plt.xlabel('小时（24小时制）', fontsize=12)
-    plt.ylabel('平均车费金额（$）', fontsize=12)
-    plt.xticks(range(selected_hour[0], selected_hour[1]+1), rotation=0)  # 只显示选中范围的小时
-    plt.grid(alpha=0.3, linestyle='--')  # 虚线网格
-    plt.legend()
-    
-    # 显示图表（特效3：添加边框阴影）
-    st.pyplot(plt)
-    
-    # 显示分析结果（特效4：高亮峰值行）
-    st.subheader('时段平均车费详情')
-    # 为峰值行添加高亮样式
-    def highlight_peak(row):
-        if row['hour'] == peak_hour['hour']:
-            return ['background-color: #FFCCCC'] * len(row)  # 浅红色背景
-        else:
-            return [''] * len(row)
-    styled_df = hourly_avg_fare.style.apply(highlight_peak, axis=1).format({
-        'fare_amount': '${:.2f}'  # 格式化车费为美元格式
-    })
-    st.dataframe(styled_df, use_container_width=True)
-
-else:
-    st.warning('所选时段内无数据，请调整范围！')
-
-
 
 
 

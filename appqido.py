@@ -432,6 +432,33 @@ else:
 
 
 
+    
+    st.subheader("5. 商业价值分析")
+    
+    # 5.1 高峰时段分析
+    hourly_avg_fare = df.groupby('hour')['fare_amount'].mean().reset_index()
+    peak_hour = hourly_avg_fare.loc[hourly_avg_fare['fare_amount'].idxmax()]
+    
+    st.write(f"• 车费最高的时段: {int(peak_hour['hour'])}点，平均车费: ${peak_hour['fare_amount']:.2f}")
+    
+    # 5.2 乘客数量与车费关系
+    passenger_fare = df.groupby('passenger_count')['fare_amount'].mean().reset_index()
+    st.write("• 不同乘客数量的平均车费:")
+    st.dataframe(passenger_fare.rename(columns={
+        'passenger_count': '乘客数量', 
+        'fare_amount': '平均车费($)'
+
+
+
+
+
+
+
+
+
+
+   
+
 
 
 
